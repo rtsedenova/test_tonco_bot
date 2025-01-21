@@ -47,7 +47,7 @@ export async function getPriceSqrt(poolAddress: string): Promise<{ poolName: str
 
         const priceSqrt = BigInt(poolState.price_sqrt.toString());
         const normalizedPriceSqrt = Number(priceSqrt) / SCALE_FACTOR;
-        const price = normalizedPriceSqrt ** 2;
+        const price = normalizedPriceSqrt ** 2 * 1000;
 
         const poolsMap = await getPoolsMap();
         const poolName = poolsMap[normalizedAddress] || "Неизвестный пул";
