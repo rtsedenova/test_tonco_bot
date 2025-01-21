@@ -1,5 +1,10 @@
 import dotenv from 'dotenv';
 
-dotenv.config();
+const ENV = process.env.NODE_ENV || 'development';
 
-export const BOT_TOKEN = process.env.BOT_TOKEN!;
+// Загружаем переменные из соответствующего .env файла
+dotenv.config({ path: `.env.${ENV}` });
+
+console.log('Loaded environment:', ENV);
+
+export const BOT_TOKEN = process.env.BOT_TOKEN || '';
