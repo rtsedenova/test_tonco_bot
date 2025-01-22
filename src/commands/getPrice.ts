@@ -3,12 +3,12 @@ import { getPriceSqrt } from "../services/poolService";
 
 export async function getPriceCommand(ctx: Context) {
     try {
-        const text = ctx.message?.text;
-
-        if (!text) {
+        if (!ctx.message || !('text' in ctx.message)) {
             await ctx.reply("Пожалуйста, отправьте текстовое сообщение.");
             return;
         }
+
+        const text = ctx.message.text;
 
         const [command, poolAddress] = text.split(" ");
 
