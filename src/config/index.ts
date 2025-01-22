@@ -1,6 +1,6 @@
 import dotenv from 'dotenv';
 
-const ENV = process.env.NODE_ENV || 'development';
+const ENV = process.env.NODE_ENV;
 
 // Загружаем переменные из соответствующего .env файла
 dotenv.config({ path: `.env.${ENV}` });
