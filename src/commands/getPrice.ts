@@ -22,7 +22,6 @@ export async function getPriceCommand(ctx: Context) {
             return;
         }
 
-        // Получаем информацию о пуле по адресу NFT
         const poolInfo = await getPoolAddressByNFT(nftAddress);
 
         if (!poolInfo) {

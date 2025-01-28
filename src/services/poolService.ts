@@ -25,13 +25,12 @@ interface PositionData {
 
 async function getPoolAddressByNFT(nftAddress: string): Promise<PositionData | null> {
   const appoloClient = new ApolloClient({
-    uri: "https://indexer.tonco.io/", // Замените на ваш GraphQL endpoint
+    uri: "https://indexer.tonco.io/", 
     credentials: "same-origin",
     cache: new InMemoryCache(),
   });
 
   try {
-    // Преобразуем адрес NFT в правильный формат для GraphQL запроса
     const nftAddressParsed = Address.parse(nftAddress).toRawString();
 
     const response = await appoloClient.query({
@@ -50,7 +49,7 @@ async function getPoolAddressByNFT(nftAddress: string): Promise<PositionData | n
       return null;
     }
 
-    const position = positionsList[0]; // Предположим, что нас интересует только первая позиция
+    const position = positionsList[0]; 
     const poolAddress = position.pool;
     const tickLower = position.tickLower;
     const tickUpper = position.tickUpper;
@@ -59,10 +58,12 @@ async function getPoolAddressByNFT(nftAddress: string): Promise<PositionData | n
     console.log(`Tick Lower: ${tickLower}`);
     console.log(`Tick Upper: ${tickUpper}`);
 
+    const formattedPoolAddress = Address.parse(poolAddress).toString();
+
     return {
       id: position.id,
       owner: position.owner,
-      pool: poolAddress,
+      pool: formattedPoolAddress,
       nftAddress: position.nftAddress,
       tickLower,
       tickUpper,
