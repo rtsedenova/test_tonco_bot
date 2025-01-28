@@ -1,60 +1,76 @@
-import { Address, TonClient4 } from "@ton/ton";
-import { getHttpV4Endpoint } from "@orbs-network/ton-access";
-import { PoolV3Contract } from "@toncodex/sdk";
 import { ApolloClient, InMemoryCache, gql } from "@apollo/client/core";
+import { Address } from "@ton/ton";
 
-const SCALE_FACTOR = Math.pow(2, 96);
-
-const POOLS_QUERY = gql`
-    query PoolsQuery {
-        pools {
-            name
-            address
-        }
+const POSITION_QUERY = gql`
+  query PositionQuery($where: PositionWhere) {
+    positions(where: $where) {
+      id
+      owner
+      pool
+      nftAddress
+      tickLower
+      tickUpper
     }
+  }
 `;
 
-async function getPoolsMap(): Promise<Record<string, string>> {
-    try {
-        const apolloClient = new ApolloClient({
-            uri: "https://indexer.tonco.io/",
-            cache: new InMemoryCache(),
-        });
-
-        const response = await apolloClient.query({ query: POOLS_QUERY });
-        const pools = response.data.pools;
-
-        return pools.reduce((map: Record<string, string>, pool: { name: string; address: string }) => {
-            const normalizedAddress = Address.parse(pool.address).toString(); 
-            map[normalizedAddress] = pool.name;
-            return map;
-        }, {});
-    } catch (error) {
-        console.error("Ошибка при запросе списка пулов:", error);
-        throw new Error("Не удалось загрузить список пулов.");
-    }
+interface PositionData {
+  id: string;
+  owner: string;
+  pool: string;
+  nftAddress: string;
+  tickLower: number;
+  tickUpper: number;
 }
 
-export async function getPriceSqrt(poolAddress: string): Promise<{ poolName: string; priceSqrt: string; price: number }> {
-    try {
-        const endpoint = await getHttpV4Endpoint();
-        const client = new TonClient4({ endpoint });
+async function getPoolAddressByNFT(nftAddress: string): Promise<PositionData | null> {
+  const appoloClient = new ApolloClient({
+    uri: "https://indexer.tonco.io/", // Замените на ваш GraphQL endpoint
+    credentials: "same-origin",
+    cache: new InMemoryCache(),
+  });
 
-        const normalizedAddress = Address.parse(poolAddress).toString(); 
-        const poolV3Contract = client.open(new PoolV3Contract(Address.parse(poolAddress)));
+  try {
+    // Преобразуем адрес NFT в правильный формат для GraphQL запроса
+    const nftAddressParsed = Address.parse(nftAddress).toRawString();
 
-        const poolState = await poolV3Contract.getPoolStateAndConfiguration();
+    const response = await appoloClient.query({
+      query: POSITION_QUERY,
+      variables: {
+        where: {
+          nftAddress: nftAddressParsed,
+        },
+      },
+    });
 
-        const priceSqrt = BigInt(poolState.price_sqrt.toString());
-        const normalizedPriceSqrt = Number(priceSqrt) / SCALE_FACTOR;
-        const price = normalizedPriceSqrt ** 2 * 1000;
+    const positionsList = response.data.positions;
 
-        const poolsMap = await getPoolsMap();
-        const poolName = poolsMap[normalizedAddress] || "Неизвестный пул";
-
-        return { poolName, priceSqrt: priceSqrt.toString(), price };
-    } catch (error) {
-        console.error("Ошибка при получении данных о пуле:", error);
-        throw new Error("Не удалось получить данные о пуле.");
+    if (positionsList.length === 0) {
+      console.log("Позиции для данного NFT не найдены.");
+      return null;
     }
+
+    const position = positionsList[0]; // Предположим, что нас интересует только первая позиция
+    const poolAddress = position.pool;
+    const tickLower = position.tickLower;
+    const tickUpper = position.tickUpper;
+
+    console.log(`Найден пул с адресом: ${poolAddress}`);
+    console.log(`Tick Lower: ${tickLower}`);
+    console.log(`Tick Upper: ${tickUpper}`);
+
+    return {
+      id: position.id,
+      owner: position.owner,
+      pool: poolAddress,
+      nftAddress: position.nftAddress,
+      tickLower,
+      tickUpper,
+    };
+  } catch (error) {
+    console.error("Ошибка при запросе данных о пуле:", error);
+    return null;
+  }
 }
+
+export { getPoolAddressByNFT };
