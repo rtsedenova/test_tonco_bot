@@ -1,5 +1,7 @@
 import { ApolloClient, InMemoryCache, gql } from "@apollo/client/core";
-import { Address } from "@ton/ton";
+import { Address, TonClient4 } from "@ton/ton";
+import { getHttpV4Endpoint } from "@orbs-network/ton-access";
+import { PoolV3Contract } from "@toncodex/sdk";
 
 const POSITION_QUERY = gql`
   query PositionQuery($where: PositionWhere) {
@@ -18,6 +20,7 @@ interface PositionData {
   id: string;
   owner: string;
   pool: string;
+  priceSqrt: BigInt;
   nftAddress: string;
   tickLower: number;
   tickUpper: number;
@@ -60,11 +63,20 @@ async function getPoolAddressByNFT(nftAddress: string): Promise<PositionData | n
 
     const formattedPoolAddress = Address.parse(poolAddress).toString();
 
+    const endpoint = await getHttpV4Endpoint();
+    const client = new TonClient4({ endpoint });
+    const poolV3Contract = client.open(new PoolV3Contract(Address.parse(poolAddress)));
+
+    const poolState = await poolV3Contract.getPoolStateAndConfiguration();
+
+    console.log("Состояние пула:", poolState);
+
     return {
       id: position.id,
       owner: position.owner,
       pool: formattedPoolAddress,
       nftAddress: position.nftAddress,
+      priceSqrt: poolState.price_sqrt,
       tickLower,
       tickUpper,
     };

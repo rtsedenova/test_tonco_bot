@@ -29,15 +29,30 @@ export async function getPriceCommand(ctx: Context) {
             return;
         }
 
-        const { id, owner, pool, tickLower, tickUpper } = poolInfo;
+        const { id, owner, pool, tickLower, tickUpper, priceSqrt } = poolInfo;
+
+        let price = Number(priceSqrt) / Math.pow(2, 96);
+        price *= 100;
+
+        let priceLower = Math.pow(1.0001, tickLower);
+        let priceUpper = Math.pow(1.0001, tickUpper);
+        priceLower *= 1000;
+        priceUpper *= 1000;
+
+        const isPriceInRange = price >= priceLower && price <= priceUpper;
 
         await ctx.reply(
             `Информация о пуле для NFT:\n\n` +
             `ID: ${id}\n` +
             `Владелец: ${owner}\n` +
             `Адрес пула: ${pool}\n` +
+            `price_sqrt: ${priceSqrt}\n` +
+            `Price: ${price}\n` +
             `Tick Lower: ${tickLower}\n` +
-            `Tick Upper: ${tickUpper}`
+            `Tick Upper: ${tickUpper}\n` +
+            `Tick Lower: ${tickLower} (Цена для tickLower: ${priceLower})\n` +
+            `Tick Upper: ${tickUpper} (Цена для tickUpper: ${priceUpper})\n` +
+            `Цена попадает в диапазон: ${isPriceInRange ? 'Да' : 'Нет'}`
         );
     } catch (error) {
         console.error("Ошибка в getPriceCommand:", error);
