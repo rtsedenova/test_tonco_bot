@@ -1,60 +1,98 @@
+import { ApolloClient, InMemoryCache, gql } from "@apollo/client/core";
 import { Address, TonClient4 } from "@ton/ton";
 import { getHttpV4Endpoint } from "@orbs-network/ton-access";
 import { PoolV3Contract } from "@toncodex/sdk";
-import { ApolloClient, InMemoryCache, gql } from "@apollo/client/core";
 
-const SCALE_FACTOR = Math.pow(2, 96);
-
-const POOLS_QUERY = gql`
-    query PoolsQuery {
-        pools {
-            name
-            address
-        }
+const POSITION_QUERY = gql`
+  query PositionQuery($where: PositionWhere) {
+    positions(where: $where) {
+      id
+      owner
+      pool
+      nftAddress
+      tickLower
+      tickUpper
     }
+  }
 `;
 
-async function getPoolsMap(): Promise<Record<string, string>> {
-    try {
-        const apolloClient = new ApolloClient({
-            uri: "https://indexer.tonco.io/",
-            cache: new InMemoryCache(),
-        });
-
-        const response = await apolloClient.query({ query: POOLS_QUERY });
-        const pools = response.data.pools;
-
-        return pools.reduce((map: Record<string, string>, pool: { name: string; address: string }) => {
-            const normalizedAddress = Address.parse(pool.address).toString(); 
-            map[normalizedAddress] = pool.name;
-            return map;
-        }, {});
-    } catch (error) {
-        console.error("Ошибка при запросе списка пулов:", error);
-        throw new Error("Не удалось загрузить список пулов.");
+const POOL_QUERY = gql`
+  query PoolQuery($where: PoolWhere) {
+    pools(where: $where) {
+      name
     }
+  }
+`;
+
+interface PositionData {
+  id: string;
+  owner: string;
+  pool: string;
+  priceSqrt: bigint;
+  nftAddress: string;
+  tickLower: number;
+  tickUpper: number;
+  poolName: string;
 }
 
-export async function getPriceSqrt(poolAddress: string): Promise<{ poolName: string; priceSqrt: string; price: number }> {
-    try {
-        const endpoint = await getHttpV4Endpoint();
-        const client = new TonClient4({ endpoint });
+async function getPoolAddressByNFT(nftAddress: string): Promise<PositionData | null> {
+  const appoloClient = new ApolloClient({
+    uri: "https://indexer.tonco.io/",
+    credentials: "same-origin",
+    cache: new InMemoryCache(),
+  });
 
-        const normalizedAddress = Address.parse(poolAddress).toString(); 
-        const poolV3Contract = client.open(new PoolV3Contract(Address.parse(poolAddress)));
+  try {
+    const nftAddressParsed = Address.parse(nftAddress).toRawString();
 
-        const poolState = await poolV3Contract.getPoolStateAndConfiguration();
+    const response = await appoloClient.query({
+      query: POSITION_QUERY,
+      variables: { where: { nftAddress: nftAddressParsed } },
+    });
 
-        const priceSqrt = BigInt(poolState.price_sqrt.toString());
-        const normalizedPriceSqrt = Number(priceSqrt) / SCALE_FACTOR;
-        const price = normalizedPriceSqrt ** 2 * 1000;
-
-        const poolsMap = await getPoolsMap();
-        const poolName = poolsMap[normalizedAddress] || "Неизвестный пул";
-
-        return { poolName, priceSqrt: priceSqrt.toString(), price };
-    } catch (error) {
-        console.error("Ошибка при получении данных о пуле:", error);
-        throw new Error("Не удалось получить данные о пуле.");
+    const positionsList = response.data.positions;
+    if (!positionsList || positionsList.length === 0) {
+      console.log("Позиции для данного NFT не найдены.");
+      return null;
     }
+
+    const position = positionsList[0];
+    const poolAddress = position.pool;
+    const tickLower = position.tickLower;
+    const tickUpper = position.tickUpper;
+
+    console.log(`Найден пул с адресом: ${poolAddress}`);
+
+    const poolNameResponse = await appoloClient.query({
+      query: POOL_QUERY,
+      variables: { where: { address: poolAddress } }, 
+    });
+
+    const poolData = poolNameResponse.data.pools;
+    const poolName = poolData && poolData.length > 0 ? poolData[0].name : "Неизвестный пул";
+
+    console.log(`Название пула: ${poolName}`);
+
+    const formattedPoolAddress = Address.parse(poolAddress).toString();
+    const endpoint = await getHttpV4Endpoint();
+    const client = new TonClient4({ endpoint });
+    const poolV3Contract = client.open(new PoolV3Contract(Address.parse(poolAddress)));
+    const poolState = await poolV3Contract.getPoolStateAndConfiguration();
+
+    return {
+      id: position.id,
+      owner: position.owner,
+      pool: formattedPoolAddress,
+      nftAddress: position.nftAddress,
+      priceSqrt: poolState.price_sqrt,
+      tickLower,
+      tickUpper,
+      poolName,
+    };
+  } catch (error) {
+    console.error("Ошибка при запросе данных о пуле:", error);
+    return null;
+  }
 }
+
+export { getPoolAddressByNFT };
