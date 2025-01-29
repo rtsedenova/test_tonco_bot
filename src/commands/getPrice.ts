@@ -1,6 +1,8 @@
 import { Context } from "telegraf";
 import { getPoolAddressByNFT } from "../services/poolService";
 
+const SCALE_FACTOR = Math.pow(2, 96);
+
 export async function getPriceCommand(ctx: Context) {
     try {
         if (!ctx.message || !('text' in ctx.message)) {
@@ -29,10 +31,11 @@ export async function getPriceCommand(ctx: Context) {
             return;
         }
 
-        const { id, owner, pool, tickLower, tickUpper, priceSqrt } = poolInfo;
+        const { id, owner, pool, tickLower, tickUpper, priceSqrt, poolName } = poolInfo;
 
-        let price = Number(priceSqrt) / Math.pow(2, 96);
-        price *= 100;
+        const priceSqrtBigInt = BigInt(priceSqrt);  
+        const normalizedPriceSqrt = Number(priceSqrtBigInt) / SCALE_FACTOR;  
+        const price = normalizedPriceSqrt ** 2 * 1000;  
 
         let priceLower = Math.pow(1.0001, tickLower);
         let priceUpper = Math.pow(1.0001, tickUpper);
@@ -46,12 +49,13 @@ export async function getPriceCommand(ctx: Context) {
             `ID: ${id}\n` +
             `Владелец: ${owner}\n` +
             `Адрес пула: ${pool}\n` +
+            `Название пула: ${poolName}\n` +
             `price_sqrt: ${priceSqrt}\n` +
-            `Price: ${price}\n` +
+            `Price: ${price.toFixed(2)}\n` +  
             `Tick Lower: ${tickLower}\n` +
             `Tick Upper: ${tickUpper}\n` +
-            `Tick Lower: ${tickLower} (Цена для tickLower: ${priceLower})\n` +
-            `Tick Upper: ${tickUpper} (Цена для tickUpper: ${priceUpper})\n` +
+            `Цена для tickLower: ${priceLower.toFixed(2)}\n` +
+            `Цена для tickUpper: ${priceUpper.toFixed(2)}\n` +
             `Цена попадает в диапазон: ${isPriceInRange ? 'Да' : 'Нет'}`
         );
     } catch (error) {
