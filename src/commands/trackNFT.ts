@@ -5,11 +5,6 @@ import { getUserTelegramId } from "../services/getUserTelegramId";
 
 const SCALE_FACTOR = Math.pow(2, 96);
 
-interface NFT {
-    nftAddress: string;
-    priceRange: { lower: number; upper: number };
-}
-
 export async function trackNFT(ctx: Context) {
     try {
         if (!ctx.message || !("text" in ctx.message)) {
@@ -33,6 +28,20 @@ export async function trackNFT(ctx: Context) {
         const priceUpper = Math.pow(1.0001, tickUpper) * 1000;
 
         const telegramId = getUserTelegramId(ctx);
+
+        // Проверяем, существует ли уже пользователь и этот NFT
+        const trackedNFTs = await getTrackedNFTs();
+        const user = trackedNFTs.find((item: any) => item.telegram_id === telegramId);
+        if (user) {
+            const existingNFT = user.nfts.find((nft: any) => nft.nftAddress === nftAddress);
+            if (existingNFT) {
+                await ctx.reply(
+                    `NFT с адресом <b>${nftAddress}</b> уже отслеживается.`,
+                    { parse_mode: "HTML" }
+                );
+                return;
+            }
+        }
 
         // Добавляем или обновляем информацию в S3
         await addTrackedNFTToS3({
