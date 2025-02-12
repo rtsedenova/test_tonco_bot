@@ -2,3 +2,5 @@ node_modules/
 dist/
 .env
 dokidoki060104.pem
+src/data/trackedNFTs.json
+structure.txt
