@@ -2,8 +2,9 @@ import { Telegraf } from "telegraf";
 import { BOT_TOKEN } from "./config";
 import { startCommand } from "./commands/start";
 import { trackNFT } from "./commands/trackNFT";
-import { untrackNFT } from "./commands/untrackNFT";
-import { handleDeleteNFT } from "./commands/untrackNFT"; 
+import { untrackNFT, handleDeleteNFT } from "./commands/untrackNFT";
+import { trackNFTPrices } from "./services/priceTracker";
+
 
 interface Callback {
   data: string;
@@ -33,6 +34,8 @@ bot.on("callback_query", async (ctx) => {
     await handleDeleteNFT(ctx);
   }
 });
+
+trackNFTPrices(bot);
 
 bot.launch(() => console.log(`Bot is running in ${process.env.NODE_ENV} mode. BOT_TOKEN: ${BOT_TOKEN}`));
 
