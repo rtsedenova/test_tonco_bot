@@ -41,3 +41,4 @@ bot.launch(() => console.log(`Bot is running in ${process.env.NODE_ENV} mode. BO
 
 process.once("SIGINT", () => { bot.stop("SIGINT"); });
 process.once("SIGTERM", () => { bot.stop("SIGTERM"); });
+
