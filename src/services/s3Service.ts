@@ -1,7 +1,8 @@
-import * as AWS from 'aws-sdk';
+import S3 from 'aws-sdk/clients/s3';  
 import { AWS_ACCESS_KEY, AWS_SECRET_ACCESS_KEY, AWS_BUCKET_NAME, AWS_REGION } from "../config";
 
-const s3 = new AWS.S3({
+// Настройка S3 с использованием клиентского SDK
+const s3 = new S3({
     accessKeyId: AWS_ACCESS_KEY,
     secretAccessKey: AWS_SECRET_ACCESS_KEY,
     region: AWS_REGION,
