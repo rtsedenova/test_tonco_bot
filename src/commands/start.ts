@@ -10,7 +10,7 @@ export const startCommand = (ctx: Context) => {
       reply_markup: Markup.inlineKeyboard([
         [
           Markup.button.callback("Track NFT", "start_tracking_nft"),
-          Markup.button.callback("Untrack NFT", "untrack_nft")  
+          Markup.button.callback("Untrack NFT", "stop_tracking_nft")  
         ]
       ]).reply_markup 
     }

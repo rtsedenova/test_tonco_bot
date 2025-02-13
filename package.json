@@ -16,8 +16,11 @@
   "license": "ISC",
   "dependencies": {
     "@apollo/client": "^3.12.6",
+    "@aws-sdk/client-s3": "^3.741.0",
+    "@aws-sdk/s3-request-presigner": "^3.741.0",
     "@orbs-network/ton-access": "^2.3.3",
     "@toncodex/sdk": "^1.0.33-testnet",
+    "aws-sdk": "^2.1692.0",
     "dotenv": "^16.4.7",
     "i": "^0.3.7",
     "nodemon": "^3.1.9",

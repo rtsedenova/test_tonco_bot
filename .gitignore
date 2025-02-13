@@ -1,4 +1,8 @@
 node_modules/
 dist/
 .env
+.env.development
+.env.production
 dokidoki060104.pem
+src/data/trackedNFTs.json
+structure.txt

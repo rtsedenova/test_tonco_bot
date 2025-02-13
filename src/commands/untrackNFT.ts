@@ -1,95 +1,108 @@
-import { Context, Markup } from "telegraf";
-import fs from "fs";
-import path from "path";
-
-// Путь к файлу, где хранятся отслеживаемые NFT
-const TRACKED_NFTS_FILE = path.resolve("src/data/trackedNFTs.json");
+import { Context } from "telegraf";
+import { getUserTelegramId } from "../services/getUserTelegramId";
+import { getTrackedNFTs, removeTrackedNFTFromS3 } from "../services/s3Service";
+import { InlineKeyboardButton } from "telegraf/typings/core/types/typegram";
 
 interface NFT {
-    nftAddress: string;
-    priceRange: { lower: number; upper: number };
+  nftAddress: string;
+  priceRange: { lower: number; upper: number };
 }
 
-// Функция для загрузки отслеживаемых NFT из файла
-function loadTrackedNFTs(): NFT[] {
-    try {
-        if (fs.existsSync(TRACKED_NFTS_FILE)) {
-            const data = fs.readFileSync(TRACKED_NFTS_FILE, "utf-8");
-            return JSON.parse(data);
+interface UserData {
+  owner_id: string;
+  telegram_id: string;
+  nfts: NFT[];
+}
+
+interface Callback {
+  data: string;
+}
+
+export const untrackNFT = async (ctx: Context) => {
+  try {
+    const telegramId = getUserTelegramId(ctx);
+
+    // Получаем данные из S3
+    const allTrackedData: UserData[] = await getTrackedNFTs();
+
+    // Ищем пользователя с заданным telegram_id
+    const user = allTrackedData.find((user) => user.telegram_id === telegramId);
+
+    if (user && user.nfts.length > 0) {
+      // Формируем список NFT с нумерацией
+      const nftList = user.nfts.map((nft, index) => `${index + 1}. ${nft.nftAddress}`).join("\n");
+
+      // Создаем inline-кнопки для каждого NFT
+      const buttons: InlineKeyboardButton[][] = user.nfts.map((nft, index) => [
+        {
+          text: `[#${index + 1}]`,
+          callback_data: `delete_nft_${nft.nftAddress}`,
+        },
+      ]);
+
+      // Отправляем сообщение с кнопками
+      await ctx.reply(
+        `Ваши отслеживаемые NFT:\n\n${nftList}`,
+        {
+          reply_markup: { inline_keyboard: buttons },
+          parse_mode: "HTML",
         }
-    } catch (error) {
-        console.error("❌ Ошибка при загрузке отслеживаемых NFT:", error);
+      );
+    } else {
+      // Если пользователь не найден или у него нет NFT
+      await ctx.reply("У вас нет отслеживаемых NFT");
     }
-    return [];
-}
+  } catch (error) {
+    console.error("❌ Ошибка в untrackNFT:", error);
+    await ctx.reply("Произошла ошибка при поиске ваших отслеживаемых NFT.");
+  }
+};
 
-// Функция для сохранения отслеживаемых NFT в файл
-function saveTrackedNFTs(trackedNFTs: NFT[]) {
-    try {
-        fs.writeFileSync(TRACKED_NFTS_FILE, JSON.stringify(trackedNFTs, null, 2));
-    } catch (error) {
-        console.error("❌ Ошибка при сохранении отслеживаемых NFT:", error);
+// Обработка callback_query для удаления
+export const handleDeleteNFT = async (ctx: Context) => {
+  try {
+    const telegramId = getUserTelegramId(ctx);
+
+    const callback = ctx.callbackQuery as Callback;
+    const callbackData = callback.data; 
+
+    if (callbackData.startsWith("delete_nft_")) {
+      const nftAddress = callbackData.replace("delete_nft_", "");
+
+      // Удаляем NFT из S3
+      await removeTrackedNFTFromS3(telegramId, nftAddress);
+
+      await ctx.answerCbQuery("NFT успешно удален.");
+      await ctx.reply(`NFT с адресом ${nftAddress} был удален из отслеживания.`);
+
+      // Обновляем список отслеживаемых NFT после удаления
+      const allTrackedData: UserData[] = await getTrackedNFTs();
+      const user = allTrackedData.find((user) => user.telegram_id === telegramId);
+
+      if (user && user.nfts.length > 0) {
+        // Формируем новый список NFT с кнопками для оставшихся
+        const nftList = user.nfts.map((nft, index) => `${index + 1}. ${nft.nftAddress}`).join("\n");
+
+        const buttons: InlineKeyboardButton[][] = user.nfts.map((nft, index) => [
+          {
+            text: `[#${index + 1}]`,
+            callback_data: `delete_nft_${nft.nftAddress}`,
+          },
+        ]);
+
+        await ctx.reply(
+          `Ваши оставшиеся отслеживаемые NFT:\n\n${nftList}`,
+          {
+            reply_markup: { inline_keyboard: buttons },
+            parse_mode: "HTML",
+          }
+        );
+      } else {
+        await ctx.reply("У вас больше нет отслеживаемых NFT.");
+      }
     }
-}
-
-// Функция для отображения списка отслеживаемых NFT с кнопками для удаления
-export async function listTrackedNFTs(ctx: Context) {
-    const trackedNFTs = loadTrackedNFTs();  // Загружаем все отслеживаемые NFT
-
-    if (trackedNFTs.length === 0) {
-        await ctx.reply("У вас нет отслеживаемых NFT.");
-        return;
-    }
-
-    // Генерируем пронумерованный список
-    const nftList = trackedNFTs.map((nft, index) => {
-        return `[#${index + 1}] <b>${nft.nftAddress}</b>`; // Добавляем номер перед адресом
-    }).join("\n");
-
-    // Кнопки для удаления: Номера кнопок будут соответствовать порядковым номерам
-    const buttons = trackedNFTs.map((nft, index) =>
-        Markup.button.callback(`${index + 1}`, `untrack_${index}`) // Номер на кнопке
-    );
-
-    // Отправляем сообщение со списком и кнопками для удаления
-    await ctx.reply(`Для прекращения отслеживания нажмите на номер адреса NFT:\n\n${nftList}`, {
-        parse_mode: "HTML",
-        reply_markup: Markup.inlineKeyboard(buttons, { columns: 3 }).reply_markup, // Кнопки с номерами
-    });
-}
-
-// Тип для контекста действия с кнопкой
-interface UntrackNFTActionContext extends Context {
-    match?: RegExpMatchArray; // Для обработки результата кнопки
-}
-
-// Действие для кнопки прекращения отслеживания NFT
-export async function untrackNFTAction(ctx: UntrackNFTActionContext) {
-    try {
-        if (!ctx.match) {
-            await ctx.reply("Не удалось извлечь данные из кнопки.");
-            return;
-        }
-
-        // Получаем номер NFT из данных действия кнопки
-        const index = parseInt(ctx.match[1], 10); // Извлекаем номер (индекс) из строки
-
-        let trackedNFTs = loadTrackedNFTs();
-
-        // Удаляем NFT из списка отслеживаемых по индексу
-        const nftToRemove = trackedNFTs[index];
-        if (!nftToRemove) {
-            await ctx.reply("NFT с таким номером не найдено.");
-            return;
-        }
-
-        trackedNFTs = trackedNFTs.filter((_, i) => i !== index); // Удаляем по индексу
-        saveTrackedNFTs(trackedNFTs);
-
-        await ctx.answerCbQuery(); // Ожидание ответа на клик по кнопке
-        await ctx.reply(`NFT с адресом <b>${nftToRemove.nftAddress}</b> больше не отслеживается.`, { parse_mode: "HTML" });
-    } catch (error) {
-        console.error("❌ Ошибка в untrackNFTAction:", error);
-        await ctx.reply("Произошла ошибка при прекращении отслеживания NFT.");
-    }
-}
+  } catch (error) {
+    console.error("❌ Ошибка в handleDeleteNFT:", error);
+    await ctx.reply("Произошла ошибка при удалении NFT.");
+  }
+};
