@@ -1,7 +1,7 @@
 import { Context } from "telegraf";
 import { getPoolAddressByNFT } from "../services/getPoolInfo";
 import { getTrackedNFTs, addTrackedNFTToS3 } from "../services/s3Service";
-import { getUserTelegramId } from "../services/getUserTelegramId";  
+import { getUserTelegramId } from "../services/getUserTgId";  
 
 const SCALE_FACTOR = Math.pow(2, 96);
 

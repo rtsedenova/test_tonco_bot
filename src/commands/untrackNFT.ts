@@ -1,5 +1,5 @@
 import { Context } from "telegraf";
-import { getUserTelegramId } from "../services/getUserTelegramId";
+import { getUserTelegramId } from "../services/getUserTgId";
 import { getTrackedNFTs, removeTrackedNFTFromS3 } from "../services/s3Service";
 import { InlineKeyboardButton } from "telegraf/typings/core/types/typegram";
 
