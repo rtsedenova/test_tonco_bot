@@ -94,7 +94,3 @@ export const removeTrackedNFTFromS3 = async (telegramId: string, nftAddress: str
     console.error('Ошибка при удалении NFT из S3:', error);
   }
 };
-<<<<<<< HEAD
-
-=======
->>>>>>> dc0b43e ([main])
