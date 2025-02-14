@@ -5,7 +5,6 @@ import { trackNFT } from "./commands/trackNFT";
 import { untrackNFT, handleDeleteNFT } from "./commands/untrackNFT";
 import { trackNFTPrices } from "./services/priceTracker";
 
-
 interface Callback {
   data: string;
 }
@@ -17,9 +16,7 @@ if (!BOT_TOKEN) {
 const bot = new Telegraf(BOT_TOKEN);
 
 bot.start(startCommand);
-
 bot.command("track", trackNFT);
-
 bot.action("stop_tracking_nft", untrackNFT);
 
 bot.action("start_tracking_nft", async (ctx) => {
@@ -35,10 +32,21 @@ bot.on("callback_query", async (ctx) => {
   }
 });
 
-trackNFTPrices(bot);
+// Проверка каждую минуту
+const startTracking = (bot: any) => {
+  setInterval(async () => {
+    try {
+      await trackNFTPrices(bot);
+      console.log('✅ Цены NFT были проверены.');
+    } catch (error) {
+      console.error('❌ Ошибка при проверке цен NFT:', error);
+    }
+  }, 60000);  
+};
+
+startTracking(bot);
 
 bot.launch(() => console.log(`Bot is running in ${process.env.NODE_ENV} mode. BOT_TOKEN: ${BOT_TOKEN}`));
 
 process.once("SIGINT", () => { bot.stop("SIGINT"); });
 process.once("SIGTERM", () => { bot.stop("SIGTERM"); });
-

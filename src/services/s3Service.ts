@@ -10,7 +10,7 @@ const s3 = new AWS.S3({
 const NFT_DATA_KEY = "trackedNFTs/nftData.json";
 
 // Запись данных в S3
-const uploadToS3 = async (data: any) => {
+export const uploadToS3 = async (data: any) => {
     try {
         await s3.putObject({
             Bucket: AWS_BUCKET_NAME,
