@@ -1,5 +1,6 @@
 const AWS = require("aws-sdk");
 import { AWS_ACCESS_KEY, AWS_SECRET_ACCESS_KEY, AWS_BUCKET_NAME, AWS_REGION } from "../config";
+import { UserData, NFT } from "../types";
 
 const s3 = new AWS.S3({
     accessKeyId: AWS_ACCESS_KEY,
@@ -9,7 +10,6 @@ const s3 = new AWS.S3({
 
 const NFT_DATA_KEY = "trackedNFTs/nftData.json";
 
-// Запись данных в S3
 export const uploadToS3 = async (data: any) => {
     try {
         await s3.putObject({
@@ -24,8 +24,7 @@ export const uploadToS3 = async (data: any) => {
     }
 };
 
-// Получение всех отслеживаемых NFT
-export const getTrackedNFTs = async (): Promise<any[]> => {
+export const getTrackedNFTs = async (): Promise<UserData[]> => {
   try {
       const data = await s3.getObject({ Bucket: AWS_BUCKET_NAME, Key: NFT_DATA_KEY }).promise();
       return data.Body ? JSON.parse(data.Body.toString("utf-8")) : [];
@@ -38,21 +37,17 @@ export const getTrackedNFTs = async (): Promise<any[]> => {
   }
 };
 
-// Добавление нового NFT
-export const addTrackedNFTToS3 = async ({ owner_id, telegram_id, nft }: { owner_id: string; telegram_id: string; nft: any }) => {
+export const addTrackedNFTToS3 = async ({ owner_id, telegram_id, nft }: { owner_id: string; telegram_id: string; nft: NFT }) => {
     const data = await getTrackedNFTs();
 
-    // Проверяем, существует ли уже пользователь с таким telegram_id
-    let user = data.find((item: any) => item.telegram_id === telegram_id);
+    let user = data.find((item: UserData) => item.telegram_id === telegram_id);
 
     if (user) {
-        // Проверяем, существует ли уже этот NFT
-        if (user.nfts.some((existingNFT: any) => existingNFT.nftAddress === nft.nftAddress)) {
+        if (user.nfts.some((existingNFT: NFT) => existingNFT.nftAddress === nft.nftAddress)) {
             throw new Error(`NFT с адресом ${nft.nftAddress} уже отслеживается.`);
         }
         user.nfts.push(nft);
     } else {
-        // Создаем нового пользователя
         data.push({
             owner_id,
             telegram_id,
@@ -61,35 +56,25 @@ export const addTrackedNFTToS3 = async ({ owner_id, telegram_id, nft }: { owner_
     }
 
     await uploadToS3(data);
-    console.log(`✅ NFT ${nft.nftAddress} добавлен в отслеживание.`);
 };
 
-// Удаление NFT 
 export const removeTrackedNFTFromS3 = async (telegramId: string, nftAddress: string) => {
   try {
     const data = await getTrackedNFTs();
-    console.log('Текущие данные из S3:', data);
 
-    // Находим пользователя
-    const user = data.find((item: any) => item.telegram_id === telegramId);
+    const user = data.find((item: UserData ) => item.telegram_id === telegramId);
     if (!user) {
       throw new Error(`У вас нет отслеживаемых NFT.`);
     }
 
-    console.log(`Исходные данные пользователя:`, JSON.stringify(user));
+    user.nfts = user.nfts.filter((nft: NFT) => nft.nftAddress !== nftAddress);
 
-    // Удаляем NFT из списка
-    user.nfts = user.nfts.filter((nft: any) => nft.nftAddress !== nftAddress);
-    console.log(`Новые данные пользователя:`, JSON.stringify(user.nfts));
-
-    // Если у пользователя больше нет NFT, удаляем его из массива
     if (user.nfts.length === 0) {
       const index = data.indexOf(user);
       data.splice(index, 1);
     }
 
     await uploadToS3(data);  
-    console.log(`✅ NFT с адресом ${nftAddress} удален из отслеживания.`);
   } catch (error) {
     console.error('Ошибка при удалении NFT из S3:', error);
   }

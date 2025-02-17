@@ -1,7 +1,9 @@
-import { ApolloClient, InMemoryCache, gql } from "@apollo/client/core";
+import { gql } from "@apollo/client";
 import { Address, TonClient4 } from "@ton/ton";
 import { getHttpV4Endpoint } from "@orbs-network/ton-access";
 import { PoolV3Contract } from "@toncodex/sdk";
+import { PositionData } from "../types/index";
+import { createApolloClient } from "../utils/apolloClient"
 
 const POSITION_QUERY = gql`
   query PositionQuery($where: PositionWhere) {
@@ -24,23 +26,8 @@ const POOL_QUERY = gql`
   }
 `;
 
-interface PositionData {
-  id: string;
-  owner: string;
-  pool: string;
-  priceSqrt: bigint;
-  nftAddress: string;
-  tickLower: number;
-  tickUpper: number;
-  poolName: string;
-}
-
 async function getPoolAddressByNFT(nftAddress: string): Promise<PositionData | null> {
-  const appoloClient = new ApolloClient({
-    uri: "https://indexer.tonco.io/",
-    credentials: "same-origin",
-    cache: new InMemoryCache(),
-  });
+  const appoloClient = createApolloClient(); 
 
   try {
     const nftAddressParsed = Address.parse(nftAddress).toRawString();
@@ -52,7 +39,6 @@ async function getPoolAddressByNFT(nftAddress: string): Promise<PositionData | n
 
     const positionsList = response.data.positions;
     if (!positionsList || positionsList.length === 0) {
-      console.log("Позиции для данного NFT не найдены.");
       return null;
     }
 
@@ -61,17 +47,13 @@ async function getPoolAddressByNFT(nftAddress: string): Promise<PositionData | n
     const tickLower = position.tickLower;
     const tickUpper = position.tickUpper;
 
-    console.log(`Найден пул с адресом: ${poolAddress}`);
-
     const poolNameResponse = await appoloClient.query({
       query: POOL_QUERY,
-      variables: { where: { address: poolAddress } }, 
+      variables: { where: { address: poolAddress } },
     });
 
     const poolData = poolNameResponse.data.pools;
     const poolName = poolData && poolData.length > 0 ? poolData[0].name : "Неизвестный пул";
-
-    console.log(`Название пула: ${poolName}`);
 
     const formattedPoolAddress = Address.parse(poolAddress).toString();
     const endpoint = await getHttpV4Endpoint();
